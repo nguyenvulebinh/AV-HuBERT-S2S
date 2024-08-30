@@ -22,6 +22,8 @@ pip install -r requirements.txt
 python run_example.py
 ```
 
+[![lip_movement.mp4]()](https://github.com/nguyenvulebinh/AV-HuBERT-S2S/raw/main/example/lip_movement.mp4)
+
 ```python
 from src.model.avhubert2text import AV2TextForConditionalGeneration
 from src.dataset.load_data import load_feature
@@ -85,98 +87,9 @@ python src/dataset/video_to_audio_lips.py
         <th>Huggingface</th>
     </tr>
     <tr>
-        <td rowspan="10">AVSR</td>
-        <th>ar</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>de</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>el</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>en</th>
-        <th><a href="nguyenvulebinh/AV-HuBERT">English Chekpoint</a></th>
-    </tr>
-    <tr>
-        <th>es</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>fr</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>it</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>pt</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>ru</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>ar,de,el,es,fr,it,pt,ru</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <td rowspan="13">AVST</td>
-        <th>en-el</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-     <tr>
-        <th>en-es</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>en-fr</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>en-it</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>en-pt</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>en-ru</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>el-en</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>es-en</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>fr-en</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>it-en</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>pt-en</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>ru-en</th>
-        <th><a href="todo">TODO</a></th>
-    </tr>
-    <tr>
-        <th>{el,es,fr,it,pt,ru}-en</th>
-        <th><a href="todo">TODO</a></th>
+        <td>AVSR</td>
+        <th>English</th>
+        <th><a href="nguyenvulebinh/AV-HuBERT">Chekpoint</a></th>
     </tr>
 </table>
 
