@@ -1,5 +1,7 @@
 # Huggingface Implementation of AV-HuBERT on the MuAViC Dataset
 
+![lip-reading](https://github.com/facebookresearch/av_hubert/blob/main/assets/lipreading.gif)
+
 This repository contains a Huggingface implementation of the AV-HuBERT (Audio-Visual Hidden Unit BERT) model, specifically trained and tested on the MuAViC (Multilingual Audio-Visual Corpus) dataset. AV-HuBERT is a self-supervised model designed for audio-visual speech recognition, leveraging both audio and visual modalities to achieve robust performance, especially in noisy environments.
 
 
@@ -21,8 +23,6 @@ conda activate avhuberts2s
 pip install -r requirements.txt
 python run_example.py
 ```
-
-[![lip_movement.mp4]()](https://github.com/nguyenvulebinh/AV-HuBERT-S2S/raw/main/example/lip_movement.mp4)
 
 ```python
 from src.model.avhubert2text import AV2TextForConditionalGeneration
