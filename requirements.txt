@@ -1,0 +1,14 @@
+torch==2.4.0
+torchaudio==2.4.0
+torchvision==0.19.0
+transformers==4.44.2
+numpy==2.0.2
+opencv-python==4.10.0.84
+sentencepiece==0.2.0
+ffmpeg-python==0.2.0
+ffmpy==0.4.0
+dlib==19.24.6
+scikit-image==0.24.0
+PyAV==12.0.5
+soundfile==0.12.1
+python_speech_features==0.6
