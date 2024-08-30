@@ -1,6 +1,6 @@
 # Huggingface Implementation of AV-HuBERT on the MuAViC Dataset
 
-![lip-reading](https://github.com/facebookresearch/av_hubert/blob/main/assets/lipreading.gif)
+![lip-reading](https://github.com/facebookresearch/av_hubert/blob/main/assets/lipreading.gif?raw=true)
 
 This repository contains a Huggingface implementation of the AV-HuBERT (Audio-Visual Hidden Unit BERT) model, specifically trained and tested on the MuAViC (Multilingual Audio-Visual Corpus) dataset. AV-HuBERT is a self-supervised model designed for audio-visual speech recognition, leveraging both audio and visual modalities to achieve robust performance, especially in noisy environments.
 
@@ -72,7 +72,6 @@ cd model-bin
 wget https://huggingface.co/nguyenvulebinh/AV-HuBERT/resolve/main/20words_mean_face.npy .
 wget https://huggingface.co/nguyenvulebinh/AV-HuBERT/resolve/main/shape_predictor_68_face_landmarks.dat .
 
-# raw video only support 4:3 ratio now
 cp raw_video.mp4 ./example/ 
 
 python src/dataset/video_to_audio_lips.py
@@ -89,7 +88,7 @@ python src/dataset/video_to_audio_lips.py
     <tr>
         <td>AVSR</td>
         <th>English</th>
-        <th><a href="nguyenvulebinh/AV-HuBERT">Chekpoint</a></th>
+        <th><a href="https://huggingface.co/nguyenvulebinh/AV-HuBERT">Chekpoint</a></th>
     </tr>
 </table>
 

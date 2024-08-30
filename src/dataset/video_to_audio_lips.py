@@ -1,8 +1,8 @@
 import os
 from ffmpy import FFmpeg
 import cv2
-import shutil
-import hashlib
+import subprocess
+import json
 import logging
 from pathlib import Path
 import ffmpeg
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # VIDEOS_CACHE = {}
 MAX_MISSING_FRAMES_RATIO = 0.75 #max video frames that is ok to be missing
 
-def resize_frames(input_frames, new_size):
+def resize_frames(input_frames, new_size=(640, 480)):
     resized_frames = []
     for frame in input_frames:
         try:
@@ -217,6 +217,7 @@ def split_video_to_frames(video_filepath, fstart=None, fend=None, out_fps=25):
 
 def detect_landmark(image):
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    # print(image.shape, gray.shape)
     rects = DETECTOR(gray, 1)
     coords = None
     for (_, rect) in enumerate(rects):
@@ -270,18 +271,18 @@ def extract_lip_movement(
         num_workers=10,
     ):
     # change video framerate to 25 and lower resolution for faster processing
-    logger.info("Adjust video framerate to 25")
+    print("Adjust video framerate to 25")
     
     FFmpeg(
         inputs={webcam_video: None},
         outputs={in_video_filepath: "-v quiet -filter:v fps=fps=25 -vf scale=640:480 -y"},
     ).run()
     # convert video to a list of frames
-    logger.info("Converting video into frames")
+    print("Converting video into frames")
     frames = list(split_video_to_frames(in_video_filepath))
     
     # Get face landmarks from video 
-    logger.info("Extract face landmarks from video frames")
+    print("Extract face landmarks from video frames")
     # landmarks = [
     #     detect_landmark(frame)
     #     for frame in tqdm(frames, desc="Detecting Lip Movement")
@@ -293,7 +294,7 @@ def extract_lip_movement(
         desc="Detecting Lip Movement"
     )
     invalid_landmarks_ratio = sum(lnd is None for lnd in landmarks) / len(landmarks)
-    logger.info(f"Current invalid frame ratio ({invalid_landmarks_ratio}) ")
+    print(f"Current invalid frame ratio ({invalid_landmarks_ratio}) ")
     if invalid_landmarks_ratio > MAX_MISSING_FRAMES_RATIO:
         logging.info(
             "Invalid frame ratio exceeded maximum allowed ratio!! " +
@@ -303,12 +304,12 @@ def extract_lip_movement(
     else:
         # interpolate frames not being detected (if found).
         if invalid_landmarks_ratio != 0:
-            logger.info("Linearly-interpolate invalid landmarks")
+            print("Linearly-interpolate invalid landmarks")
             continuous_landmarks = landmarks_interpolate(landmarks)
         else:
             continuous_landmarks = landmarks
         # crop mouth regions
-        logger.info("Cropping the mouth region.")
+        print("Cropping the mouth region.")
         sequence = crop_patch(
             frames,
             len(frames),
@@ -318,26 +319,81 @@ def extract_lip_movement(
     # return lip-movement frames
     save_video(sequence, out_lip_filepath, fps=25)
 
+def get_video_resolution_for_padding(video_path):
+    """Get the resolution of the input video."""
+    command = [
+        'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
+        'stream=width,height', '-of', 'json', video_path
+    ]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    video_info = json.loads(result.stdout)
+    width = video_info['streams'][0]['width']
+    height = video_info['streams'][0]['height']
+    return width, height
+
+def calculate_padding(width, height, target_width, target_height):
+    """Calculate the necessary padding to fit the video into the target resolution."""
+    aspect_ratio = width / height
+    target_aspect_ratio = target_width / target_height
+
+    if aspect_ratio > target_aspect_ratio:
+        # Video is wider than the target, adjust height
+        new_width = target_width
+        new_height = int(target_width / aspect_ratio)
+        pad_top = (target_height - new_height) // 2
+        pad_bottom = target_height - new_height - pad_top
+        pad_left = pad_right = 0
+    else:
+        # Video is taller than the target, adjust width
+        new_height = target_height
+        new_width = int(target_height * aspect_ratio)
+        pad_left = (target_width - new_width) // 2
+        pad_right = target_width - new_width - pad_left
+        pad_top = pad_bottom = 0
+
+    return new_width, new_height, pad_left, pad_right, pad_top, pad_bottom
+
+def pad_video(input_path, output_path, target_width=640, target_height=480):
+    """Pad the video to ensure it fits"""
+    width, height = get_video_resolution_for_padding(input_path)
+    
+    print("Original video resolution:", width, height)
+    new_width, new_height, pad_left, pad_right, pad_top, pad_bottom = calculate_padding(width, height, target_width=target_width, target_height=target_height)
+
+    # Create padding command
+    command = [
+        'ffmpeg', '-i', input_path, '-vf',
+        f"scale={new_width}:{new_height},pad={target_width}:{target_height}:{pad_left}:{pad_top}:black",
+        '-c:a', 'copy', output_path, '-v', 'quiet', '-y'
+    ]
+
+    # Run ffmpeg command
+    subprocess.run(command)
+    print("Padded video resolution:", new_width, new_height)
+
 if __name__ == "__main__":
     DETECTOR, PREDICTOR, MEAN_FACE_LANDMARKS = load_needed_models_for_lip_movement()
 
     outpath = Path("./example")
     input_video_path = outpath / "raw_video.mp4"
     audio_filepath = outpath / "audio.wav"
+    norm_video_filepath = outpath / "normalized_video.mp4"
     video_filepath = outpath / "video.mp4"
     noisy_audio_filepath = outpath / "noisy_audio.wav"
     lip_video_filepath = outpath / "lip_movement.mp4"
     noisy_lip_filepath = outpath / "noisy_lip_movement.mp4"
 
+    pad_video(input_video_path, norm_video_filepath)
+    
     # start the lip movement preprocessing pipeline
     extract_lip_movement(
-        input_video_path, video_filepath, lip_video_filepath,
+        norm_video_filepath, video_filepath, lip_video_filepath,
         num_workers=min(os.cpu_count(), 5)
     )
 
     # extract audio from the video
     FFmpeg(
-        inputs={input_video_path: None},
+        inputs={norm_video_filepath: None},
         outputs={noisy_audio_filepath: "-v quiet -vn -acodec pcm_s16le -ar 16000 -ac 1 -y"},
     ).run()
 
