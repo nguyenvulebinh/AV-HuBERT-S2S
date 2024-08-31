@@ -13,6 +13,7 @@ from tqdm import tqdm
 from skimage import transform
 import warnings
 from tqdm.contrib.concurrent import process_map
+from functools import partial
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,9 @@ def load_needed_models_for_lip_movement(metadata_path=Path("./model-bin")):
         detector, predictor, mean_face_landmarks
     )
 
+# Load needed models for lip movement
+DETECTOR, PREDICTOR, MEAN_FACE_LANDMARKS = load_needed_models_for_lip_movement()
+
 def get_video_resolution(video_filepath):
     for stream in ffmpeg.probe(video_filepath)["streams"]:
         if stream["codec_type"] == "video":
@@ -290,8 +294,8 @@ def extract_lip_movement(
     landmarks = process_map(
         detect_landmark,
         frames,
-        max_workers=num_workers,
-        desc="Detecting Lip Movement"
+        desc="Detecting Lip Movement",
+        max_workers=num_workers
     )
     invalid_landmarks_ratio = sum(lnd is None for lnd in landmarks) / len(landmarks)
     print(f"Current invalid frame ratio ({invalid_landmarks_ratio}) ")
@@ -371,17 +375,20 @@ def pad_video(input_path, output_path, target_width=640, target_height=480):
     subprocess.run(command)
     print("Padded video resolution:", new_width, new_height)
 
-if __name__ == "__main__":
-    DETECTOR, PREDICTOR, MEAN_FACE_LANDMARKS = load_needed_models_for_lip_movement()
+def process_raw_data_for_avsr(input_file_path):
+    assert input_file_path.endswith(".mp4"), "Input file must be end with .mp4, but got {}".format(input_file_path)
+    # outpath = Path(input_file_path).parent
+    file_name = Path
 
-    outpath = Path("./example")
-    input_video_path = outpath / "raw_video.mp4"
-    audio_filepath = outpath / "audio.wav"
-    norm_video_filepath = outpath / "normalized_video.mp4"
-    video_filepath = outpath / "video.mp4"
-    noisy_audio_filepath = outpath / "noisy_audio.wav"
-    lip_video_filepath = outpath / "lip_movement.mp4"
-    noisy_lip_filepath = outpath / "noisy_lip_movement.mp4"
+    input_video_path = Path(input_file_path)
+    input_file_name = input_video_path.stem.replace(" ", "_")
+    outpath = Path(input_file_path).parent
+    audio_filepath = outpath / f"{input_file_name}_audio.wav"
+    norm_video_filepath = outpath / f"{input_file_name}_normalized_video.mp4"
+    video_filepath = outpath / f"{input_file_name}_video.mp4"
+    noisy_audio_filepath = outpath / f"{input_file_name}_noisy_audio.wav"
+    lip_video_filepath = outpath / f"{input_file_name}_lip_movement.mp4"
+    noisy_lip_filepath = outpath / f"{input_file_name}_noisy_lip_movement.mp4"
 
     pad_video(input_video_path, norm_video_filepath)
     
@@ -402,3 +409,19 @@ if __name__ == "__main__":
         inputs={noisy_audio_filepath: None, lip_video_filepath: None},
         outputs={noisy_lip_filepath: "-v quiet -c:v copy -c:a aac -y"},
     ).run()
+
+    assert noisy_lip_filepath.exists(), f"Failed to generate lip movement video at {noisy_lip_filepath}"
+    assert noisy_audio_filepath.exists(), f"Failed to generate audio file at {noisy_audio_filepath}"
+    assert lip_video_filepath.exists(), f"Failed to generate lip movement video at {lip_video_filepath}"
+
+    return {
+        "lip_movement": lip_video_filepath,
+        "audio": noisy_audio_filepath,
+        "lip_video_path": noisy_lip_filepath
+    }
+
+
+if __name__ == "__main__":
+    process_raw_data_for_avsr(
+        './cache/example/raw_video.mp4'
+    )
