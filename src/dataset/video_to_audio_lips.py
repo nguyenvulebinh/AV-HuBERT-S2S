@@ -11,11 +11,13 @@ import numpy as np
 from collections import deque
 from tqdm import tqdm
 from skimage import transform
+from scipy.io import wavfile
 import warnings
+import time
 from tqdm.contrib.concurrent import process_map
 from functools import partial
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 # VIDEOS_CACHE = {}
 MAX_MISSING_FRAMES_RATIO = 0.75 #max video frames that is ok to be missing
@@ -375,7 +377,83 @@ def pad_video(input_path, output_path, target_width=640, target_height=480):
     subprocess.run(command)
     print("Padded video resolution:", new_width, new_height)
 
-def process_raw_data_for_avsr(input_file_path):
+
+def add_noise(signal, noise, snr):
+    """
+    signal: 1D tensor in [-32768, 32767] (16-bit depth)
+    noise: 1D tensor in [-32768, 32767] (16-bit depth)
+    snr: tuple or float
+    """
+    signal = signal.astype(np.float32)
+    noise = noise.astype(np.float32)
+
+    if type(snr) == tuple:
+        assert len(snr) == 2
+        snr = np.random.uniform(snr[0], snr[1])
+    else:
+        snr = float(snr)
+
+    if len(signal) > len(noise):
+        ratio = int(np.ceil(len(signal) / len(noise)))
+        noise = np.concatenate([noise for _ in range(ratio)])
+    if len(signal) < len(noise):
+        start = 0
+        noise = noise[start : start + len(signal)]
+
+    amp_s = np.sqrt(np.mean(np.square(signal), axis=-1))
+    amp_n = np.sqrt(np.mean(np.square(noise), axis=-1))
+    noise = noise * (amp_s / amp_n) / (10 ** (snr / 20))
+    mixed = signal + noise
+
+    # Avoid clipping noise
+    max_int16 = np.iinfo(np.int16).max
+    min_int16 = np.iinfo(np.int16).min
+    if mixed.max(axis=0) > max_int16 or mixed.min(axis=0) < min_int16:
+        if mixed.max(axis=0) >= abs(mixed.min(axis=0)):
+            reduction_rate = max_int16 / mixed.max(axis=0)
+        else:
+            reduction_rate = min_int16 / mixed.min(axis=0)
+        mixed = mixed * (reduction_rate)
+    mixed = mixed.astype(np.int16)
+    return mixed
+
+# def mix_audio_with_noise(webcam_video, audio_file, out_file, noise_wav_file, snr):
+#     # get audio from webcam video
+#     FFmpeg(
+#         inputs={webcam_video: None},
+#         outputs={audio_file: "-v quiet -vn -acodec pcm_s16le -ar 16000 -ac 1 -y"},
+#     ).run()
+#     # read audio WAV file
+#     audio, sr, _ = wavfile.read(audio_file)
+#     # read noise WAV file
+#     print(f"Noise Wav used is {noise_wav_file}")
+#     noise_wav, _, _ = wavfile.read(noise_wav_file)
+#     # mix audio + noise
+#     mixed = add_noise(np.array(audio).T[0], np.array(noise_wav).T[0], snr)
+#     # save resulting noisy audio WAV file
+#     torchaudio.save(out_file, torch.from_numpy(mixed).unsqueeze(0), sr, encoding="PCM_S", bits_per_sample=16)
+#     print(f"Audio mixed with noise saved at {out_file}")
+#     return mixed
+
+def mix_audio_with_noise(webcam_video, audio_file, out_file, noise_wav_file, snr):
+    # get audio from webcam video
+    FFmpeg(
+        inputs={webcam_video: None},
+        outputs={audio_file: "-v quiet -vn -acodec pcm_s16le -ar 16000 -ac 1 -y"},
+    ).run()
+    # read audio WAV file
+    sr, audio = wavfile.read(audio_file)
+    # read noise WAV file
+    print(f"Noise Wav used is {noise_wav_file}")
+    _, noise_wav = wavfile.read(noise_wav_file)
+    # mix audio + noise
+    mixed = add_noise(audio, noise_wav, snr)
+    # save resulting noisy audio WAV file
+    wavfile.write(out_file, sr, mixed)
+    print(f"Audio mixed with noise saved at {out_file}")
+    return mixed
+
+def process_raw_data_for_avsr(input_file_path, noise_wav_file=None, noise_snr=None):
     assert input_file_path.endswith(".mp4"), "Input file must be end with .mp4, but got {}".format(input_file_path)
     # outpath = Path(input_file_path).parent
     file_name = Path
@@ -383,12 +461,13 @@ def process_raw_data_for_avsr(input_file_path):
     input_video_path = Path(input_file_path)
     input_file_name = input_video_path.stem.replace(" ", "_")
     outpath = Path(input_file_path).parent
-    audio_filepath = outpath / f"{input_file_name}_audio.wav"
-    norm_video_filepath = outpath / f"{input_file_name}_normalized_video.mp4"
-    video_filepath = outpath / f"{input_file_name}_video.mp4"
-    noisy_audio_filepath = outpath / f"{input_file_name}_noisy_audio.wav"
-    lip_video_filepath = outpath / f"{input_file_name}_lip_movement.mp4"
-    noisy_lip_filepath = outpath / f"{input_file_name}_noisy_lip_movement.mp4"
+    ctime = int(time.time())
+    audio_filepath = outpath / f"{input_file_name}_audio_{ctime}.wav"
+    norm_video_filepath = outpath / f"{input_file_name}_normalized_video_{ctime}.mp4"
+    video_filepath = outpath / f"{input_file_name}_video_{ctime}.mp4"
+    noisy_audio_filepath = outpath / f"{input_file_name}_noisy_audio_{ctime}.wav"
+    lip_video_filepath = outpath / f"{input_file_name}_lip_movement_{ctime}.mp4"
+    noisy_lip_filepath = outpath / f"{input_file_name}_noisy_lip_movement_{ctime}.mp4"
 
     pad_video(input_video_path, norm_video_filepath)
     
@@ -398,11 +477,18 @@ def process_raw_data_for_avsr(input_file_path):
         num_workers=min(os.cpu_count(), 5)
     )
 
-    # extract audio from the video
-    FFmpeg(
-        inputs={norm_video_filepath: None},
-        outputs={noisy_audio_filepath: "-v quiet -vn -acodec pcm_s16le -ar 16000 -ac 1 -y"},
-    ).run()
+    if noise_wav_file is not None:
+        # extract audio from the video and mix with noise
+        mix_audio_with_noise(
+            norm_video_filepath, audio_filepath, noisy_audio_filepath,
+            noise_wav_file, noise_snr
+        )
+    else:
+        # extract audio from the video
+        FFmpeg(
+            inputs={norm_video_filepath: None},
+            outputs={noisy_audio_filepath: "-v quiet -vn -acodec pcm_s16le -ar 16000 -ac 1 -y"},
+        ).run()
 
     # combine audio with lip movement
     FFmpeg(
