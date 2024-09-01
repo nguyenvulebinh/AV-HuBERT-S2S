@@ -466,16 +466,19 @@ def process_raw_data_for_avsr(input_file_path, noise_wav_file=None, noise_snr=No
     norm_video_filepath = outpath / f"{input_file_name}_normalized_video_{ctime}.mp4"
     video_filepath = outpath / f"{input_file_name}_video_{ctime}.mp4"
     noisy_audio_filepath = outpath / f"{input_file_name}_noisy_audio_{ctime}.wav"
-    lip_video_filepath = outpath / f"{input_file_name}_lip_movement_{ctime}.mp4"
+    lip_video_filepath = outpath / f"{input_file_name}_lip_movement.mp4"
     noisy_lip_filepath = outpath / f"{input_file_name}_noisy_lip_movement_{ctime}.mp4"
 
     pad_video(input_video_path, norm_video_filepath)
     
     # start the lip movement preprocessing pipeline
-    extract_lip_movement(
-        norm_video_filepath, video_filepath, lip_video_filepath,
-        num_workers=min(os.cpu_count(), 5)
-    )
+    if not lip_video_filepath.exists():
+        extract_lip_movement(
+            norm_video_filepath, video_filepath, lip_video_filepath,
+            num_workers=min(os.cpu_count(), 5)
+        )
+    else:
+        print(f"Using existing lip movement video at {lip_video_filepath}")
 
     if noise_wav_file is not None:
         # extract audio from the video and mix with noise

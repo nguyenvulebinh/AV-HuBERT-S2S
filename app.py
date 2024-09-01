@@ -89,7 +89,11 @@ if __name__ == "__main__":
             gr.Video(label="Lip Movement", include_audio=True, height=256, width=256),
             gr.Text(label="Process time"),
             gr.Text(label="Text output"),
-        ]
+        ],
+        examples=[
+            ["./example/video/s1_v2_c1.mp4", 10, "party"],
+            ["./example/video/s2_v1_c1.mp4", 0, "party"],
+        ],
     )
 
-    demo.launch(debug=True)
+    demo.launch()
